@@ -338,6 +338,7 @@ export default function GenerateSudokuScreen() {
               lockedCells={lockedCells}
               selectedCell={null}
               originalGrid={displayGrid}
+              disableErrorChecking={true}
             />
           )}
         </View>

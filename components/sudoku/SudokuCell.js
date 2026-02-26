@@ -93,9 +93,10 @@ function SudokuCell({
 
   // Render notes in a 3x3 mini-grid
   const renderNotes = () => {
-    if (value !== 0 || notes.size === 0) return null;
+    // Defensive check - ensure notes is a valid Set
+    const safeNotes = notes instanceof Set ? notes : new Set();
+    if (value !== 0 || safeNotes.size === 0) return null;
 
-    const noteArray = Array.from(notes).sort((a, b) => a - b);
     const noteSize = cellSize / 3.5;
 
     return (
@@ -105,7 +106,7 @@ function SudokuCell({
             key={num}
             style={[styles.noteCell, { width: noteSize, height: noteSize }]}
           >
-            {notes.has(num) && (
+            {safeNotes.has(num) && (
               <Text style={[styles.noteText, { fontSize: cellSize / 4.5 }]}>
                 {num}
               </Text>

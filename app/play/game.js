@@ -38,6 +38,7 @@ export default function GameScreen() {
     scannedPuzzles,
     isPencilMode,
     errorMode,
+    showTimer,
     selectCell,
     updateCell,
     toggleNote,
@@ -58,7 +59,7 @@ export default function GameScreen() {
 
   // Check for completion
   useEffect(() => {
-    if (currentGame && !currentGame.isComplete) {
+    if (currentGame?.currentGrid && !currentGame.isComplete) {
       const grid = currentGame.currentGrid;
       if (isGridComplete(grid)) {
         if (isValidSolution(grid)) {
@@ -85,7 +86,7 @@ export default function GameScreen() {
       const { row, col } = currentGame.selectedCell;
 
       // Don't allow editing locked cells
-      if (currentGame.lockedCells[row][col]) return;
+      if (currentGame.lockedCells?.[row]?.[col]) return;
 
       if (isPencilMode) {
         // Toggle note
@@ -104,7 +105,7 @@ export default function GameScreen() {
     const { row, col } = currentGame.selectedCell;
 
     // Don't allow clearing locked cells
-    if (currentGame.lockedCells[row][col]) return;
+    if (currentGame.lockedCells?.[row]?.[col]) return;
 
     clearCell(row, col);
   }, [currentGame, clearCell]);
@@ -125,7 +126,7 @@ export default function GameScreen() {
   };
 
   const handleVerify = () => {
-    if (!currentGame) return;
+    if (!currentGame?.currentGrid) return;
 
     const grid = currentGame.currentGrid;
 
@@ -153,7 +154,7 @@ export default function GameScreen() {
 
   // Calculate progress
   const progress = useMemo(() => {
-    if (!currentGame) return 0;
+    if (!currentGame?.currentGrid || !currentGame?.originalGrid) return 0;
     const total = 81;
     const filled = currentGame.currentGrid
       .flat()
@@ -161,10 +162,12 @@ export default function GameScreen() {
     const original = currentGame.originalGrid
       .flat()
       .filter((cell) => cell !== 0).length;
-    return (((filled - original) / (total - original)) * 100).toFixed(1);
+    const remaining = total - original;
+    if (remaining === 0) return 100;
+    return (((filled - original) / remaining) * 100).toFixed(1);
   }, [currentGame]);
 
-  if (!currentGame) {
+  if (!currentGame || !currentGame.currentGrid) {
     return null;
   }
 
@@ -183,7 +186,7 @@ export default function GameScreen() {
           </Text>
           <View style={styles.statsRow}>
             <Text style={styles.puzzleNumber}>
-              PZ {currentPuzzleIndex + 1}/{scannedPuzzles.length}
+              PZ {(currentPuzzleIndex ?? 0) + 1}/{scannedPuzzles?.length ?? 0}
             </Text>
             <View style={styles.progressBadge}>
               <Text style={styles.progressText}>{progress}%</Text>
@@ -191,7 +194,7 @@ export default function GameScreen() {
           </View>
         </View>
 
-        <GameTimer elapsedMs={currentGame.elapsedTime} />
+        {showTimer && <GameTimer elapsedMs={currentGame.elapsedTime ?? 0} />}
       </View>
 
       <ScrollView

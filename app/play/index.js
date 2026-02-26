@@ -103,12 +103,9 @@ export default function PlayScanScreen() {
         setNfcStatus("success");
         setStatusMessage(`Found ${result.puzzles.length} puzzle(s)!`);
 
-        // Store puzzles and navigate to list
+        // Store puzzles - useEffect will handle navigation when state updates
         setScannedPuzzles(result.puzzles);
-
-        setTimeout(() => {
-          router.replace("/play/puzzle-list");
-        }, 1000);
+        // Note: Navigation is handled by useEffect watching scannedPuzzles
       } else {
         setNfcStatus("error");
         setStatusMessage(result.message || "No valid puzzles found");

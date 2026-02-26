@@ -1,11 +1,19 @@
 /**
  * SettingsModal Component
  *
- * Modal for app settings, primarily error checking mode selection.
+ * Modal for app settings including error checking mode and gameplay preferences.
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   BorderRadius,
@@ -20,12 +28,44 @@ import {
 } from "../context/game-context";
 
 /**
+ * Toggle setting row component
+ */
+function SettingToggle({ label, description, value, onValueChange }) {
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.toggleTextContainer}>
+        <Text style={styles.toggleLabel}>{label}</Text>
+        <Text style={styles.toggleDescription}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: Colors.borderMedium, true: Colors.primaryLight }}
+        thumbColor={value ? Colors.primary : Colors.surface}
+        ios_backgroundColor={Colors.borderMedium}
+      />
+    </View>
+  );
+}
+
+/**
  * @param {Object} props
  * @param {boolean} props.visible - Whether modal is visible
  * @param {function} props.onClose - Close handler
  */
 function SettingsModal({ visible, onClose }) {
-  const { errorMode, setErrorMode } = useGame();
+  const {
+    errorMode,
+    setErrorMode,
+    showTimer,
+    setShowTimer,
+    autoCandidateRemoval,
+    setAutoCandidateRemoval,
+    highlightSameDigits,
+    setHighlightSameDigits,
+    highlightRegions,
+    setHighlightRegions,
+  } = useGame();
 
   const errorModeOptions = [
     {
@@ -66,7 +106,45 @@ function SettingsModal({ visible, onClose }) {
         </View>
 
         {/* Content */}
-        <View style={styles.content}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Display Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Display</Text>
+
+            <SettingToggle
+              label="Show Timer"
+              description="Display elapsed time while playing"
+              value={showTimer}
+              onValueChange={setShowTimer}
+            />
+
+            <SettingToggle
+              label="Highlight Same Digits"
+              description="Highlight all cells with the same number when selecting a filled cell"
+              value={highlightSameDigits}
+              onValueChange={setHighlightSameDigits}
+            />
+
+            <SettingToggle
+              label="Highlight Regions"
+              description="Highlight the row, column, and box of the selected cell"
+              value={highlightRegions}
+              onValueChange={setHighlightRegions}
+            />
+          </View>
+
+          {/* Gameplay Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Gameplay</Text>
+
+            <SettingToggle
+              label="Auto Candidate Removal"
+              description="Automatically remove pencil marks when a number is placed in the same row, column, or box"
+              value={autoCandidateRemoval}
+              onValueChange={setAutoCandidateRemoval}
+            />
+          </View>
+
           {/* Error Checking Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Error Checking Mode</Text>
@@ -111,7 +189,10 @@ function SettingsModal({ visible, onClose }) {
               ))}
             </View>
           </View>
-        </View>
+
+          {/* Bottom padding for scroll */}
+          <View style={{ height: Spacing.xxxl }} />
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -151,13 +232,41 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   sectionDescription: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
+  // Toggle styles
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.surface,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  toggleTextContainer: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  toggleLabel: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  toggleDescription: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  // Radio button styles
   optionsContainer: {
     gap: Spacing.md,
   },

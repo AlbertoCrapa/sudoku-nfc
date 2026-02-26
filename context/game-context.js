@@ -23,6 +23,7 @@ import {
   createEmptyNotes,
   createLockedCellsMask,
   deepCopyGrid,
+  getBoxIndex,
   safeStringToGrid,
 } from "../modules/sudoku-engine";
 
@@ -48,10 +49,22 @@ export const ERROR_MODE_LABELS = {
   [ERROR_MODES.VERIFIED]: "Verified Solution",
 };
 
+// Default settings values
+const DEFAULT_SETTINGS = {
+  showTimer: true,
+  autoCandidateRemoval: false,
+  highlightSameDigits: true,
+  highlightRegions: true,
+};
+
 // Storage keys
 const STORAGE_KEYS = {
   ERROR_MODE: "@sudoku_error_mode",
   BACKGROUND_STATE: "@sudoku_background_state",
+  SHOW_TIMER: "@sudoku_show_timer",
+  AUTO_CANDIDATE_REMOVAL: "@sudoku_auto_candidate_removal",
+  HIGHLIGHT_SAME_DIGITS: "@sudoku_highlight_same_digits",
+  HIGHLIGHT_REGIONS: "@sudoku_highlight_regions",
 };
 
 // ============================================================================
@@ -83,6 +96,10 @@ const initialState = {
 
   // Settings
   errorMode: ERROR_MODES.NONE,
+  showTimer: DEFAULT_SETTINGS.showTimer,
+  autoCandidateRemoval: DEFAULT_SETTINGS.autoCandidateRemoval,
+  highlightSameDigits: DEFAULT_SETTINGS.highlightSameDigits,
+  highlightRegions: DEFAULT_SETTINGS.highlightRegions,
 
   // UI state
   isPencilMode: false,
@@ -112,6 +129,10 @@ const ActionTypes = {
   UPDATE_ELAPSED_TIME: "UPDATE_ELAPSED_TIME",
   RESTORE_STATE: "RESTORE_STATE",
   MARK_COMPLETE: "MARK_COMPLETE",
+  SET_SHOW_TIMER: "SET_SHOW_TIMER",
+  SET_AUTO_CANDIDATE_REMOVAL: "SET_AUTO_CANDIDATE_REMOVAL",
+  SET_HIGHLIGHT_SAME_DIGITS: "SET_HIGHLIGHT_SAME_DIGITS",
+  SET_HIGHLIGHT_REGIONS: "SET_HIGHLIGHT_REGIONS",
 };
 
 // ============================================================================
@@ -227,10 +248,23 @@ function gameReducer(state, action) {
       newGrid[row][col] = safeValue;
 
       // Clear notes for this cell when placing a number
+      // Optionally remove candidate from related cells if autoCandidateRemoval is enabled
+      const targetBoxIndex = getBoxIndex(row, col);
       const newNotes = state.currentGame.notes.map((r, ri) =>
         r.map((c, ci) => {
           if (ri === row && ci === col) {
             return new Set();
+          }
+          // Auto candidate removal: remove placed value from same row, column, and box
+          if (state.autoCandidateRemoval && safeValue !== 0) {
+            const inSameRow = ri === row;
+            const inSameCol = ci === col;
+            const inSameBox = getBoxIndex(ri, ci) === targetBoxIndex;
+            if (inSameRow || inSameCol || inSameBox) {
+              const newSet = new Set(c);
+              newSet.delete(safeValue);
+              return newSet;
+            }
           }
           return new Set(c);
         }),
@@ -380,6 +414,30 @@ function gameReducer(state, action) {
         errorMode: action.payload,
       };
 
+    case ActionTypes.SET_SHOW_TIMER:
+      return {
+        ...state,
+        showTimer: action.payload,
+      };
+
+    case ActionTypes.SET_AUTO_CANDIDATE_REMOVAL:
+      return {
+        ...state,
+        autoCandidateRemoval: action.payload,
+      };
+
+    case ActionTypes.SET_HIGHLIGHT_SAME_DIGITS:
+      return {
+        ...state,
+        highlightSameDigits: action.payload,
+      };
+
+    case ActionTypes.SET_HIGHLIGHT_REGIONS:
+      return {
+        ...state,
+        highlightRegions: action.payload,
+      };
+
     case ActionTypes.SET_LOADING:
       return {
         ...state,
@@ -432,7 +490,7 @@ function gameReducer(state, action) {
 // CONTEXT
 // ============================================================================
 
-const GameContext = createContext(null);
+export const GameContext = createContext(null);
 
 // ============================================================================
 // PROVIDER
@@ -443,9 +501,9 @@ export function GameProvider({ children }) {
   const appStateRef = useRef(AppState.currentState);
   const timerRef = useRef(null);
 
-  // Load error mode from storage on mount
+  // Load settings from storage on mount
   useEffect(() => {
-    loadErrorMode();
+    loadSettings();
   }, []);
 
   // Handle app state changes (background/foreground)
@@ -495,17 +553,54 @@ export function GameProvider({ children }) {
     [state],
   );
 
-  const loadErrorMode = async () => {
+  const loadSettings = async () => {
     try {
-      const savedMode = await AsyncStorage.getItem(STORAGE_KEYS.ERROR_MODE);
+      const [
+        savedMode,
+        savedShowTimer,
+        savedAutoCandidateRemoval,
+        savedHighlightSameDigits,
+        savedHighlightRegions,
+      ] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.ERROR_MODE),
+        AsyncStorage.getItem(STORAGE_KEYS.SHOW_TIMER),
+        AsyncStorage.getItem(STORAGE_KEYS.AUTO_CANDIDATE_REMOVAL),
+        AsyncStorage.getItem(STORAGE_KEYS.HIGHLIGHT_SAME_DIGITS),
+        AsyncStorage.getItem(STORAGE_KEYS.HIGHLIGHT_REGIONS),
+      ]);
+
       if (savedMode !== null) {
         dispatch({
           type: ActionTypes.SET_ERROR_MODE,
           payload: parseInt(savedMode, 10),
         });
       }
+      if (savedShowTimer !== null) {
+        dispatch({
+          type: ActionTypes.SET_SHOW_TIMER,
+          payload: savedShowTimer === "true",
+        });
+      }
+      if (savedAutoCandidateRemoval !== null) {
+        dispatch({
+          type: ActionTypes.SET_AUTO_CANDIDATE_REMOVAL,
+          payload: savedAutoCandidateRemoval === "true",
+        });
+      }
+      if (savedHighlightSameDigits !== null) {
+        dispatch({
+          type: ActionTypes.SET_HIGHLIGHT_SAME_DIGITS,
+          payload: savedHighlightSameDigits === "true",
+        });
+      }
+      if (savedHighlightRegions !== null) {
+        dispatch({
+          type: ActionTypes.SET_HIGHLIGHT_REGIONS,
+          payload: savedHighlightRegions === "true",
+        });
+      }
     } catch (error) {
-      console.error("Error loading error mode:", error);
+      console.error("Error loading settings:", error);
     }
   };
 
@@ -590,6 +685,54 @@ export function GameProvider({ children }) {
     }
   }, []);
 
+  const setShowTimer = useCallback(async (enabled) => {
+    dispatch({ type: ActionTypes.SET_SHOW_TIMER, payload: enabled });
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.SHOW_TIMER, enabled.toString());
+    } catch (error) {
+      console.error("Error saving show timer setting:", error);
+    }
+  }, []);
+
+  const setAutoCandidateRemoval = useCallback(async (enabled) => {
+    dispatch({
+      type: ActionTypes.SET_AUTO_CANDIDATE_REMOVAL,
+      payload: enabled,
+    });
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.AUTO_CANDIDATE_REMOVAL,
+        enabled.toString(),
+      );
+    } catch (error) {
+      console.error("Error saving auto candidate removal setting:", error);
+    }
+  }, []);
+
+  const setHighlightSameDigits = useCallback(async (enabled) => {
+    dispatch({ type: ActionTypes.SET_HIGHLIGHT_SAME_DIGITS, payload: enabled });
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.HIGHLIGHT_SAME_DIGITS,
+        enabled.toString(),
+      );
+    } catch (error) {
+      console.error("Error saving highlight same digits setting:", error);
+    }
+  }, []);
+
+  const setHighlightRegions = useCallback(async (enabled) => {
+    dispatch({ type: ActionTypes.SET_HIGHLIGHT_REGIONS, payload: enabled });
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.HIGHLIGHT_REGIONS,
+        enabled.toString(),
+      );
+    } catch (error) {
+      console.error("Error saving highlight regions setting:", error);
+    }
+  }, []);
+
   const setLoading = useCallback((loading) => {
     dispatch({ type: ActionTypes.SET_LOADING, payload: loading });
   }, []);
@@ -619,6 +762,10 @@ export function GameProvider({ children }) {
     setPencilMode,
     togglePencilMode,
     setErrorMode,
+    setShowTimer,
+    setAutoCandidateRemoval,
+    setHighlightSameDigits,
+    setHighlightRegions,
     setLoading,
     markComplete,
   };

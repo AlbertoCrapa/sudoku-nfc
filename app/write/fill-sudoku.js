@@ -174,6 +174,7 @@ export default function FillSudokuScreen() {
             selectedCell={selectedCell}
             originalGrid={grid}
             onCellPress={handleCellPress}
+            disableErrorChecking={true}
           />
         </View>
 

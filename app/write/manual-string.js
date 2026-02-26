@@ -163,6 +163,7 @@ export default function ManualStringScreen() {
                 )}
                 selectedCell={null}
                 originalGrid={previewGrid}
+                disableErrorChecking={true}
               />
             </View>
           )}
