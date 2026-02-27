@@ -23,8 +23,8 @@ export const Colors = {
   cellBackgroundAlt: "#2a2c3e", // Alternate for 3x3 box distinction
 
   // Selection and highlights
-  selectedCell: "#5a5d8a",
-  highlightedCell: "#3d3f5c",
+  selectedCell: "rgba(99, 102, 241, 0.25)",
+  highlightedCell: "#303248",
   sameNumberHighlight: "#2d2f45",
 
   // Accent colors

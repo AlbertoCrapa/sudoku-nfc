@@ -65,6 +65,8 @@ function SettingsModal({ visible, onClose }) {
     setHighlightSameDigits,
     highlightRegions,
     setHighlightRegions,
+    debugMode,
+    setDebugMode,
   } = useGame();
 
   const errorModeOptions = [
@@ -188,6 +190,18 @@ function SettingsModal({ visible, onClose }) {
                 </Pressable>
               ))}
             </View>
+          </View>
+
+          {/* Developer Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Developer</Text>
+
+            <SettingToggle
+              label="Debug Mode"
+              description="Skip NFC checks and use hardcoded test puzzles"
+              value={debugMode}
+              onValueChange={setDebugMode}
+            />
           </View>
 
           {/* Bottom padding for scroll */}

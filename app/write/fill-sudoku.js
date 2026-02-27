@@ -182,8 +182,7 @@ export default function FillSudokuScreen() {
         <NumberPad
           onNumberPress={handleNumberPress}
           onClear={handleClear}
-          onPencilToggle={() => {}}
-          isPencilMode={false}
+          hidePencilMode
         />
       </ScrollView>
 

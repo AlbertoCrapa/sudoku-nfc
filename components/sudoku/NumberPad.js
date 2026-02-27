@@ -25,6 +25,7 @@ import {
  * @param {boolean} props.isPencilMode - Whether pencil mode is active
  * @param {boolean} props.canUndo - Whether undo is available
  * @param {boolean} props.canRedo - Whether redo is available
+ * @param {boolean} props.hidePencilMode - Hide the pencil mode toggle
  */
 function NumberPad({
   onNumberPress,
@@ -35,6 +36,7 @@ function NumberPad({
   isPencilMode = false,
   canUndo = false,
   canRedo = false,
+  hidePencilMode = false,
 }) {
   const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -43,23 +45,25 @@ function NumberPad({
       {/* Action buttons row */}
       <View style={styles.actionsRow}>
         {/* Pencil Mode Toggle */}
-        <Pressable
-          style={[
-            styles.actionButton,
-            isPencilMode && styles.actionButtonActive,
-          ]}
-          onPress={onPencilToggle}
-        >
-          <Text style={styles.pencilIcon}>✏️</Text>
-          <Text
+        {!hidePencilMode && (
+          <Pressable
             style={[
-              styles.actionButtonText,
-              isPencilMode && styles.actionButtonTextActive,
+              styles.actionButton,
+              isPencilMode && styles.actionButtonActive,
             ]}
+            onPress={onPencilToggle}
           >
-            Pencil (P)
-          </Text>
-        </Pressable>
+            <Text style={styles.pencilIcon}>✏️</Text>
+            <Text
+              style={[
+                styles.actionButtonText,
+                isPencilMode && styles.actionButtonTextActive,
+              ]}
+            >
+              Pencil (P)
+            </Text>
+          </Pressable>
+        )}
 
         {/* Clear Button */}
         <Pressable style={styles.actionButton} onPress={onClear}>

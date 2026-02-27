@@ -30,8 +30,12 @@ const BYTES_PER_DELIMITER = 1;
  */
 export async function isNfcSupported() {
   try {
-    // Check if NfcManager is available
-    if (!NfcManager || typeof NfcManager.isSupported !== "function") {
+    // Check if NfcManager is available and has the required method
+    if (
+      NfcManager == null ||
+      NfcManager.isSupported == null ||
+      typeof NfcManager.isSupported !== "function"
+    ) {
       return false;
     }
     const supported = await NfcManager.isSupported();
@@ -51,6 +55,9 @@ export async function isNfcSupported() {
  */
 export async function isNfcEnabled() {
   try {
+    if (NfcManager == null || NfcManager.isEnabled == null) {
+      return false;
+    }
     return await NfcManager.isEnabled();
   } catch (error) {
     console.error("Error checking NFC enabled state:", error);

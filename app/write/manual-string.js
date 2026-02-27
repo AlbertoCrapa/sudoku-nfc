@@ -138,7 +138,6 @@ export default function ManualStringScreen() {
               autoCorrect={false}
               keyboardType="numeric"
               maxLength={81}
-              editable={!isWriting}
             />
             <Text style={styles.charCount}>
               {inputString.length}/81 characters

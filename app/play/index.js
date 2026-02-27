@@ -36,11 +36,17 @@ import {
 
 export default function PlayScanScreen() {
   const router = useRouter();
-  const { setScannedPuzzles, clearScannedPuzzles, scannedPuzzles } = useGame();
+  const { setScannedPuzzles, clearScannedPuzzles, scannedPuzzles, debugMode } =
+    useGame();
   const [isScanning, setIsScanning] = useState(false);
   const [nfcStatus, setNfcStatus] = useState("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [settingsVisible, setSettingsVisible] = useState(false);
+
+  // Hardcoded debug puzzles (only used when debugMode is enabled)
+  const DEBUG_PUZZLES = [
+    "009000000000005620145000000200970001070401060400063008000000514032500000000000700",
+  ];
 
   // Handle back navigation - clear puzzles when going back to main
   useFocusEffect(
@@ -71,6 +77,12 @@ export default function PlayScanScreen() {
   }, [scannedPuzzles]);
 
   const startScanning = async () => {
+    // Debug mode: skip NFC checks and use hardcoded puzzles
+    if (debugMode) {
+      setScannedPuzzles(DEBUG_PUZZLES);
+      return;
+    }
+
     try {
       // Check NFC support
       const supported = await isNfcSupported();

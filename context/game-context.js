@@ -65,6 +65,7 @@ const STORAGE_KEYS = {
   AUTO_CANDIDATE_REMOVAL: "@sudoku_auto_candidate_removal",
   HIGHLIGHT_SAME_DIGITS: "@sudoku_highlight_same_digits",
   HIGHLIGHT_REGIONS: "@sudoku_highlight_regions",
+  DEBUG_MODE: "@sudoku_debug_mode",
 };
 
 // ============================================================================
@@ -100,6 +101,7 @@ const initialState = {
   autoCandidateRemoval: DEFAULT_SETTINGS.autoCandidateRemoval,
   highlightSameDigits: DEFAULT_SETTINGS.highlightSameDigits,
   highlightRegions: DEFAULT_SETTINGS.highlightRegions,
+  debugMode: false,
 
   // UI state
   isPencilMode: false,
@@ -133,6 +135,7 @@ const ActionTypes = {
   SET_AUTO_CANDIDATE_REMOVAL: "SET_AUTO_CANDIDATE_REMOVAL",
   SET_HIGHLIGHT_SAME_DIGITS: "SET_HIGHLIGHT_SAME_DIGITS",
   SET_HIGHLIGHT_REGIONS: "SET_HIGHLIGHT_REGIONS",
+  SET_DEBUG_MODE: "SET_DEBUG_MODE",
 };
 
 // ============================================================================
@@ -438,6 +441,12 @@ function gameReducer(state, action) {
         highlightRegions: action.payload,
       };
 
+    case ActionTypes.SET_DEBUG_MODE:
+      return {
+        ...state,
+        debugMode: action.payload,
+      };
+
     case ActionTypes.SET_LOADING:
       return {
         ...state,
@@ -561,12 +570,14 @@ export function GameProvider({ children }) {
         savedAutoCandidateRemoval,
         savedHighlightSameDigits,
         savedHighlightRegions,
+        savedDebugMode,
       ] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.ERROR_MODE),
         AsyncStorage.getItem(STORAGE_KEYS.SHOW_TIMER),
         AsyncStorage.getItem(STORAGE_KEYS.AUTO_CANDIDATE_REMOVAL),
         AsyncStorage.getItem(STORAGE_KEYS.HIGHLIGHT_SAME_DIGITS),
         AsyncStorage.getItem(STORAGE_KEYS.HIGHLIGHT_REGIONS),
+        AsyncStorage.getItem(STORAGE_KEYS.DEBUG_MODE),
       ]);
 
       if (savedMode !== null) {
@@ -597,6 +608,12 @@ export function GameProvider({ children }) {
         dispatch({
           type: ActionTypes.SET_HIGHLIGHT_REGIONS,
           payload: savedHighlightRegions === "true",
+        });
+      }
+      if (savedDebugMode !== null) {
+        dispatch({
+          type: ActionTypes.SET_DEBUG_MODE,
+          payload: savedDebugMode === "true",
         });
       }
     } catch (error) {
@@ -733,6 +750,15 @@ export function GameProvider({ children }) {
     }
   }, []);
 
+  const setDebugMode = useCallback(async (enabled) => {
+    dispatch({ type: ActionTypes.SET_DEBUG_MODE, payload: enabled });
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.DEBUG_MODE, enabled.toString());
+    } catch (error) {
+      console.error("Error saving debug mode setting:", error);
+    }
+  }, []);
+
   const setLoading = useCallback((loading) => {
     dispatch({ type: ActionTypes.SET_LOADING, payload: loading });
   }, []);
@@ -766,6 +792,7 @@ export function GameProvider({ children }) {
     setAutoCandidateRemoval,
     setHighlightSameDigits,
     setHighlightRegions,
+    setDebugMode,
     setLoading,
     markComplete,
   };
