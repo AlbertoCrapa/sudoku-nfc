@@ -57,6 +57,28 @@ const DEFAULT_SETTINGS = {
   highlightRegions: true,
 };
 
+/**
+ * Reverse-calculates difficulty percentage from clue count.
+ * Based on the anchor points:
+ * - 0%: 40 clues (Easy)
+ * - 50%: 30 clues (Medium)
+ * - 100%: 17 clues (Hard)
+ * @param {number} clues - Number of filled cells (clues) in the puzzle
+ * @returns {number} Difficulty percentage (0-100)
+ */
+function cluesToDifficultyPercentage(clues) {
+  // Clamp clues to valid range
+  const c = Math.max(17, Math.min(40, clues));
+
+  if (c >= 30) {
+    // Interpolate between Easy (40 clues = 0%) and Medium (30 clues = 50%)
+    return Math.round(((40 - c) / (40 - 30)) * 50);
+  } else {
+    // Interpolate between Medium (30 clues = 50%) and Hard (17 clues = 100%)
+    return Math.round(50 + ((30 - c) / (30 - 17)) * 50);
+  }
+}
+
 // Storage keys
 const STORAGE_KEYS = {
   ERROR_MODE: "@sudoku_error_mode",
@@ -211,6 +233,10 @@ function gameReducer(state, action) {
       const lockedCells = createLockedCellsMask(grid);
       const notes = createEmptyNotes();
 
+      // Calculate difficulty percentage from clue count
+      const clueCount = grid.flat().filter((cell) => cell !== 0).length;
+      const difficultyPercentage = cluesToDifficultyPercentage(clueCount);
+
       return {
         ...state,
         gameStates: newGameStates,
@@ -224,6 +250,7 @@ function gameReducer(state, action) {
           isComplete: false,
           startTime: Date.now(),
           elapsedTime: 0,
+          difficultyPercentage,
         },
       };
     }

@@ -33,15 +33,18 @@ import { generatePuzzle, gridToString } from "../../modules/sudoku-engine";
 // Difficulty presets
 // Percentage maps to both difficulty (0-1 range) and affects clue count
 const DIFFICULTY_LEVELS = [
-  { id: "easy", label: "Easy", percentage: 20, clues: 40 },
-  { id: "medium", label: "Medium", percentage: 40, clues: 32 },
-  { id: "hard", label: "Hard", percentage: 60, clues: 25 },
-  { id: "expert", label: "Expert", percentage: 80, clues: 22 },
+  { id: "easy", label: "Easy", percentage: 0, clues: 40 },
+  { id: "medium", label: "Medium", percentage: 50, clues: 30 },
+  { id: "hard", label: "Hard", percentage: 100, clues: 17 },
   { id: "custom", label: "Custom", percentage: null, clues: null },
 ];
 
 /**
  * Maps a percentage (0-100) to min/max difficulty and clue count.
+ * Interpolates between three anchor points:
+ * - 0%: Easy (difficulty 0-0.33, 40 clues)
+ * - 50%: Medium (difficulty 0.34-0.66, 30 clues)
+ * - 100%: Hard (difficulty 0.66-1.0, 17 clues)
  * @param {number} percentage - Difficulty percentage (0-100)
  * @returns {{ minDiff: number, maxDiff: number, clues: number }}
  */
@@ -49,15 +52,21 @@ function percentageToDifficulty(percentage) {
   // Clamp percentage to 0-100
   const p = Math.max(0, Math.min(100, percentage));
 
-  // Map percentage to difficulty (0-1 range)
-  // 0% = very easy (0.0-0.1), 100% = maximum (1.0-1.0)
-  const minDiff = p / 100;
-  const maxDiff = Math.min(1.0, minDiff + 0.1);
+  let minDiff, maxDiff, clues;
 
-  // Map percentage to clue count
-  // 0% = 45 clues (very easy), 100% = 17 clues (minimum possible unique solution)
-  // Linear interpolation: 45 - (45-17) * (p/100) = 45 - 28 * (p/100)
-  const clues = Math.round(45 - 28 * (p / 100));
+  if (p <= 50) {
+    // Interpolate between Easy (0%) and Medium (50%)
+    const t = p / 50; // 0 to 1 within this range
+    minDiff = 0 + t * 0.34; // 0 → 0.34
+    maxDiff = 0.33 + t * (0.66 - 0.33); // 0.33 → 0.66
+    clues = Math.round(40 - t * (40 - 30)); // 40 → 30
+  } else {
+    // Interpolate between Medium (50%) and Hard (100%)
+    const t = (p - 50) / 50; // 0 to 1 within this range
+    minDiff = 0.34 + t * (0.66 - 0.34); // 0.34 → 0.66
+    maxDiff = 0.66 + t * (1.0 - 0.66); // 0.66 → 1.0
+    clues = Math.round(30 - t * (30 - 17)); // 30 → 17
+  }
 
   return { minDiff, maxDiff, clues };
 }
@@ -67,8 +76,8 @@ export default function GenerateSudokuScreen() {
   const { addPuzzle, getPendingCount } = useWriteBuffer();
 
   const [selectedPreset, setSelectedPreset] = useState("medium");
-  const [percentage, setPercentage] = useState(40);
-  const [percentageInput, setPercentageInput] = useState("40");
+  const [percentage, setPercentage] = useState(50);
+  const [percentageInput, setPercentageInput] = useState("50");
   const [grid, setGrid] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
 

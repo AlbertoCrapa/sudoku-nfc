@@ -6,7 +6,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -152,20 +152,8 @@ export default function GameScreen() {
     }
   };
 
-  // Calculate progress
-  const progress = useMemo(() => {
-    if (!currentGame?.currentGrid || !currentGame?.originalGrid) return 0;
-    const total = 81;
-    const filled = currentGame.currentGrid
-      .flat()
-      .filter((cell) => cell !== 0).length;
-    const original = currentGame.originalGrid
-      .flat()
-      .filter((cell) => cell !== 0).length;
-    const remaining = total - original;
-    if (remaining === 0) return 100;
-    return (((filled - original) / remaining) * 100).toFixed(1);
-  }, [currentGame]);
+  // Get difficulty percentage from game state
+  const difficultyPercentage = currentGame?.difficultyPercentage ?? 0;
 
   if (!currentGame || !currentGame.currentGrid) {
     return null;
@@ -189,7 +177,7 @@ export default function GameScreen() {
               PZ {(currentPuzzleIndex ?? 0) + 1}/{scannedPuzzles?.length ?? 0}
             </Text>
             <View style={styles.progressBadge}>
-              <Text style={styles.progressText}>{progress}%</Text>
+              <Text style={styles.progressText}>{difficultyPercentage}%</Text>
             </View>
           </View>
         </View>
