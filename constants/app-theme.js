@@ -23,9 +23,9 @@ export const Colors = {
   cellBackgroundAlt: "#2a2c3e", // Alternate for 3x3 box distinction
 
   // Selection and highlights
-  selectedCell: "rgba(15, 5, 38, 0.55)",
-  highlightedCell:  "rgba(18, 10, 53, 0.25)",
-  sameNumberHighlight: "#2d2f45",
+  selectedCell: "rgba(76, 0, 255, 0.8)",
+  highlightedCell:  "rgba(25, 14, 85, 0.25)",
+  sameNumberHighlight: "rgba(76, 0, 255, 0.4)",
 
   // Accent colors
   primary: "#7c7fba",

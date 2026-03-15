@@ -177,7 +177,11 @@ export default function GameScreen() {
               PZ {(currentPuzzleIndex ?? 0) + 1}/{scannedPuzzles?.length ?? 0}
             </Text>
             <View style={styles.progressBadge}>
-              <Text style={styles.progressText}>{difficultyPercentage}%</Text>
+              <Text style={styles.progressText}>
+                {difficultyPercentage > 100
+                  ? "xx.x%"
+                  : `${difficultyPercentage}%`}
+              </Text>
             </View>
           </View>
         </View>

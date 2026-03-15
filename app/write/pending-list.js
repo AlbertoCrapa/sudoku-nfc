@@ -28,12 +28,24 @@ import {
 } from "../../constants/app-theme";
 import { useWriteBuffer } from "../../context/write-buffer-context";
 import {
+  analyzePuzzleDifficulty,
+  getDifficultyInfoFromScore,
+  stringToGrid,
+} from "../../modules/sudoku-engine";
+import {
   isNfcEnabled,
   isNfcSupported,
   openNfcSettings,
   writePuzzlesToTag,
 } from "../../modules/nfc-handler";
-import { stringToGrid } from "../../modules/sudoku-engine";
+
+const DIFFICULTY_COLORS = {
+  easy: Colors.success,
+  medium: "#eab308",
+  hard: "#f97316",
+  expert: Colors.error,
+  invalid: Colors.textMuted,
+};
 
 export default function PendingListScreen() {
   const router = useRouter();
@@ -115,30 +127,32 @@ export default function PendingListScreen() {
 
       setLastWriteResult(result);
 
-      if (result.success) {
-        setWriteStatus({ nfcStatus: "success", message: result.message });
-
-        // Show detailed result
-        if (result.discarded > 0) {
-          Alert.alert(
-            "Partial Write",
-            `Attempted: ${result.attempted}\nWritten: ${result.written}\nDiscarded: ${result.discarded} (tag capacity limit)`,
-            [
-              {
-                text: "OK",
-                onPress: () => {
-                  clearAllPuzzles();
-                  router.back();
-                },
+      if (result.overflow) {
+        // Too many puzzles for tag capacity
+        setWriteStatus({ nfcStatus: "idle", message: "" });
+        Alert.alert(
+          "Too Many Sudokus!",
+          `Loaded: ${result.attempted} - Max: ${result.maxPuzzles}\n\nWhat do you want to do?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => {
+                clearAllPuzzles();
+                router.replace("/write");
               },
-            ],
-          );
-        } else {
-          setTimeout(() => {
-            clearAllPuzzles();
-            router.back();
-          }, 1500);
-        }
+            },
+            {
+              text: "Remove Sudokus",
+              onPress: () => {
+                // Stay on current screen to let user remove puzzles
+              },
+            },
+          ],
+        );
+      } else if (result.success) {
+        setWriteStatus({ nfcStatus: "success", message: result.message });
+        // Don't auto-navigate - let user retry or finish
       } else {
         setWriteStatus({ nfcStatus: "error", message: result.message });
       }
@@ -158,6 +172,18 @@ export default function PendingListScreen() {
     resetWriteStatus();
   };
 
+  const handleRetryWrite = () => {
+    resetWriteStatus();
+    // Small delay to reset UI before starting again
+    setTimeout(() => handleWriteToNfc(), 100);
+  };
+
+  const handleFinishWrite = () => {
+    clearAllPuzzles();
+    resetWriteStatus();
+    router.back();
+  };
+
   const getClueCount = (puzzleString) => {
     try {
       const grid = stringToGrid(puzzleString);
@@ -167,16 +193,30 @@ export default function PendingListScreen() {
     }
   };
 
-  const getDifficulty = (clueCount) => {
-    if (clueCount >= 40) return { label: "Easy", color: Colors.success };
-    if (clueCount >= 32) return { label: "Medium", color: Colors.primary };
-    if (clueCount >= 25) return { label: "Hard", color: "#f97316" };
-    return { label: "Expert", color: Colors.error };
+  const getDifficulty = (puzzleString) => {
+    try {
+      const grid = stringToGrid(puzzleString);
+      const info = analyzePuzzleDifficulty(grid);
+      return {
+        ...info,
+        color: DIFFICULTY_COLORS[info.key] || Colors.textMuted,
+      };
+    } catch {
+      const info = getDifficultyInfoFromScore(-0.2);
+      return {
+        ...info,
+        color: DIFFICULTY_COLORS[info.key] || Colors.textMuted,
+      };
+    }
+  };
+
+  const formatPercentage = (percentage) => {
+    return `${percentage.toFixed(1)}%`;
   };
 
   const renderPuzzleItem = ({ item, index }) => {
     const clueCount = getClueCount(item);
-    const difficulty = getDifficulty(clueCount);
+    const difficulty = getDifficulty(item);
 
     return (
       <View style={styles.puzzleCard}>
@@ -192,7 +232,7 @@ export default function PendingListScreen() {
               <Text
                 style={[styles.difficultyText, { color: difficulty.color }]}
               >
-                {difficulty.label}
+                {difficulty.label} {formatPercentage(difficulty.percentage)}
               </Text>
             </View>
           </View>
@@ -267,6 +307,33 @@ export default function PendingListScreen() {
               style={styles.cancelButton}
             />
           )}
+          {!isWriting &&
+            (writeStatus.nfcStatus === "success" ||
+              writeStatus.nfcStatus === "error") && (
+              <View style={styles.nfcActionButtons}>
+                <Button
+                  title="Write Another"
+                  variant="secondary"
+                  onPress={handleRetryWrite}
+                  style={styles.retryButton}
+                />
+                {writeStatus.nfcStatus === "success" && (
+                  <Button
+                    title="Done"
+                    onPress={handleFinishWrite}
+                    style={styles.doneButton}
+                  />
+                )}
+                {writeStatus.nfcStatus === "error" && (
+                  <Button
+                    title="Cancel"
+                    variant="outline"
+                    onPress={resetWriteStatus}
+                    style={styles.doneButton}
+                  />
+                )}
+              </View>
+            )}
         </View>
       )}
 
@@ -358,6 +425,18 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginTop: Spacing.lg,
+  },
+  nfcActionButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
+    width: "100%",
+  },
+  retryButton: {
+    flex: 1,
+  },
+  doneButton: {
+    flex: 1,
   },
   listContent: {
     paddingHorizontal: Spacing.screenHorizontal,

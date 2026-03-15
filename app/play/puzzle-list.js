@@ -24,7 +24,19 @@ import {
   Typography,
 } from "../../constants/app-theme";
 import { useGame } from "../../context/game-context";
-import { stringToGrid } from "../../modules/sudoku-engine";
+import {
+  analyzePuzzleDifficulty,
+  getDifficultyInfoFromScore,
+  stringToGrid,
+} from "../../modules/sudoku-engine";
+
+const DIFFICULTY_COLORS = {
+  easy: Colors.success,
+  medium: "#eab308",
+  hard: "#f97316",
+  expert: Colors.error,
+  invalid: Colors.textMuted,
+};
 
 export default function PuzzleListScreen() {
   const router = useRouter();
@@ -83,16 +95,26 @@ export default function PuzzleListScreen() {
     }
   };
 
-  const getDifficulty = (clueCount) => {
-    if (clueCount >= 40) return { label: "Easy", color: Colors.success };
-    if (clueCount >= 32) return { label: "Medium", color: Colors.primary };
-    if (clueCount >= 25) return { label: "Hard", color: "#f97316" };
-    return { label: "Expert", color: Colors.error };
+  const getDifficulty = (puzzleString) => {
+    try {
+      const grid = stringToGrid(puzzleString);
+      const info = analyzePuzzleDifficulty(grid);
+      return {
+        label: info.label,
+        color: DIFFICULTY_COLORS[info.key] || Colors.textMuted,
+      };
+    } catch {
+      const info = getDifficultyInfoFromScore(-0.2);
+      return {
+        label: info.label,
+        color: DIFFICULTY_COLORS[info.key] || Colors.textMuted,
+      };
+    }
   };
 
   const renderPuzzleItem = ({ item, index }) => {
     const clueCount = getClueCount(item);
-    const difficulty = getDifficulty(clueCount);
+    const difficulty = getDifficulty(item);
     const emptyCells = 81 - clueCount;
 
     // Check if this puzzle has been started (has saved game state)

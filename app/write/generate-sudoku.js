@@ -76,10 +76,29 @@ export default function GenerateSudokuScreen() {
   const { addPuzzle, getPendingCount } = useWriteBuffer();
 
   const [selectedPreset, setSelectedPreset] = useState("medium");
-  const [percentage, setPercentage] = useState(50);
-  const [percentageInput, setPercentageInput] = useState("50");
   const [grid, setGrid] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Custom parameters for direct control
+  const [customMinDiff, setCustomMinDiff] = useState("0.34");
+  const [customMaxDiff, setCustomMaxDiff] = useState("0.66");
+  const [customClues, setCustomClues] = useState("30");
+
+  // Get current settings based on preset or custom
+  const getCurrentSettings = useCallback(() => {
+    if (selectedPreset === "custom") {
+      return {
+        minDiff: parseFloat(customMinDiff) || 0,
+        maxDiff: parseFloat(customMaxDiff) || 1,
+        clues: parseInt(customClues, 10) || 30,
+      };
+    }
+    const preset = DIFFICULTY_LEVELS.find((d) => d.id === selectedPreset);
+    if (preset) {
+      return percentageToDifficulty(preset.percentage);
+    }
+    return percentageToDifficulty(50);
+  }, [selectedPreset, customMinDiff, customMaxDiff, customClues]);
 
   // Generate puzzle with current settings
   const generateNewPuzzle = useCallback(() => {
@@ -89,7 +108,7 @@ export default function GenerateSudokuScreen() {
     // Use setTimeout to allow UI to update before heavy computation
     setTimeout(() => {
       try {
-        const { minDiff, maxDiff, clues } = percentageToDifficulty(percentage);
+        const { minDiff, maxDiff, clues } = getCurrentSettings();
         const newGrid = generatePuzzle(minDiff, maxDiff, clues);
         setGrid(newGrid);
       } catch (error) {
@@ -102,7 +121,7 @@ export default function GenerateSudokuScreen() {
         setIsGenerating(false);
       }
     }, 100);
-  }, [percentage]);
+  }, [getCurrentSettings]);
 
   // Generate initial puzzle on mount
   useEffect(() => {
@@ -116,9 +135,6 @@ export default function GenerateSudokuScreen() {
     if (presetId !== "custom") {
       const preset = DIFFICULTY_LEVELS.find((d) => d.id === presetId);
       if (preset) {
-        setPercentage(preset.percentage);
-        setPercentageInput(String(preset.percentage));
-
         // Generate new puzzle with preset settings
         setIsGenerating(true);
         setGrid(null);
@@ -142,47 +158,39 @@ export default function GenerateSudokuScreen() {
     }
   };
 
-  // Handle percentage input change
-  const handlePercentageChange = (text) => {
-    // Allow only digits
+  // Handle custom input changes
+  const handleCustomMinDiffChange = (text) => {
+    const filtered = text.replace(/[^0-9.]/g, "");
+    setCustomMinDiff(filtered);
+  };
+
+  const handleCustomMaxDiffChange = (text) => {
+    const filtered = text.replace(/[^0-9.]/g, "");
+    setCustomMaxDiff(filtered);
+  };
+
+  const handleCustomCluesChange = (text) => {
     const filtered = text.replace(/[^0-9]/g, "");
-    setPercentageInput(filtered);
-
-    if (filtered === "") return;
-
-    // Parse and clamp
-    const value = Math.max(0, Math.min(100, parseInt(filtered, 10) || 0));
-    setPercentage(value);
-
-    // Switch to custom preset if value doesn't match any preset
-    const matchingPreset = DIFFICULTY_LEVELS.find(
-      (d) => d.percentage === value && d.id !== "custom",
-    );
-    if (matchingPreset) {
-      setSelectedPreset(matchingPreset.id);
-    } else {
-      setSelectedPreset("custom");
-    }
+    setCustomClues(filtered);
   };
 
-  // Handle percentage blur - clamp and update
-  const handlePercentageBlur = () => {
-    const value = Math.max(
-      0,
-      Math.min(100, parseInt(percentageInput, 10) || 0),
-    );
-    setPercentage(value);
-    setPercentageInput(String(value));
+  // Handle applying custom settings
+  const handleApplyCustom = () => {
+    // Validate and clamp values
+    const minDiff = Math.max(0, Math.min(1, parseFloat(customMinDiff) || 0));
+    const maxDiff = Math.max(0, Math.min(1, parseFloat(customMaxDiff) || 1));
+    const clues = Math.max(17, Math.min(81, parseInt(customClues, 10) || 30));
 
-    // Generate new puzzle if value changed
-    if (value !== percentage) {
-      generateNewPuzzle();
+    // Update inputs with clamped values
+    setCustomMinDiff(minDiff.toFixed(2));
+    setCustomMaxDiff(maxDiff.toFixed(2));
+    setCustomClues(String(clues));
+
+    // Ensure min <= max
+    if (minDiff > maxDiff) {
+      setCustomMinDiff(maxDiff.toFixed(2));
     }
-  };
 
-  // Handle applying custom percentage
-  const handleApplyPercentage = () => {
-    handlePercentageBlur();
     generateNewPuzzle();
   };
 
@@ -233,12 +241,8 @@ export default function GenerateSudokuScreen() {
       .fill(null)
       .map(() => Array(9).fill(0));
 
-  // Get current difficulty info
-  const {
-    minDiff,
-    maxDiff,
-    clues: targetClues,
-  } = percentageToDifficulty(percentage);
+  // Get current settings for display
+  const currentSettings = getCurrentSettings();
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -270,7 +274,7 @@ export default function GenerateSudokuScreen() {
         <View style={styles.difficultyContainer}>
           <Text style={styles.sectionLabel}>Difficulty Preset</Text>
           <View style={styles.difficultyButtons}>
-            {DIFFICULTY_LEVELS.filter((d) => d.id !== "custom").map((level) => (
+            {DIFFICULTY_LEVELS.map((level) => (
               <Pressable
                 key={level.id}
                 style={[
@@ -293,36 +297,68 @@ export default function GenerateSudokuScreen() {
           </View>
         </View>
 
-        {/* Custom Percentage Input */}
-        <View style={styles.percentageContainer}>
-          <Text style={styles.sectionLabel}>
-            Difficulty Percentage (0-100%)
-          </Text>
-          <View style={styles.percentageRow}>
-            <TextInput
-              style={styles.percentageInput}
-              value={percentageInput}
-              onChangeText={handlePercentageChange}
-              onBlur={handlePercentageBlur}
-              keyboardType="numeric"
-              maxLength={3}
-              selectTextOnFocus
-              editable={!isGenerating}
-            />
-            <Text style={styles.percentageSymbol}>%</Text>
-            <Button
-              title="Apply"
-              variant="secondary"
-              onPress={handleApplyPercentage}
-              disabled={isGenerating}
-              style={styles.applyButton}
-            />
+        {/* Custom Parameters Input */}
+        {selectedPreset === "custom" && (
+          <View style={styles.customContainer}>
+            <Text style={styles.sectionLabel}>Custom Parameters</Text>
+            <View style={styles.customInputsRow}>
+              <View style={styles.customInputGroup}>
+                <Text style={styles.customInputLabel}>Min Diff</Text>
+                <TextInput
+                  style={styles.customInput}
+                  value={customMinDiff}
+                  onChangeText={handleCustomMinDiffChange}
+                  keyboardType="decimal-pad"
+                  maxLength={4}
+                  selectTextOnFocus
+                  editable={!isGenerating}
+                  placeholder="0.00"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <View style={styles.customInputGroup}>
+                <Text style={styles.customInputLabel}>Max Diff</Text>
+                <TextInput
+                  style={styles.customInput}
+                  value={customMaxDiff}
+                  onChangeText={handleCustomMaxDiffChange}
+                  keyboardType="decimal-pad"
+                  maxLength={4}
+                  selectTextOnFocus
+                  editable={!isGenerating}
+                  placeholder="1.00"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <View style={styles.customInputGroup}>
+                <Text style={styles.customInputLabel}>Clues</Text>
+                <TextInput
+                  style={styles.customInput}
+                  value={customClues}
+                  onChangeText={handleCustomCluesChange}
+                  keyboardType="numeric"
+                  maxLength={2}
+                  selectTextOnFocus
+                  editable={!isGenerating}
+                  placeholder="30"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <Button
+                title="Apply"
+                variant="secondary"
+                onPress={handleApplyCustom}
+                disabled={isGenerating}
+                style={styles.applyButton}
+              />
+            </View>
+            <Text style={styles.customHint}>
+              Difficulty: {currentSettings.minDiff.toFixed(2)}-
+              {currentSettings.maxDiff.toFixed(2)}, Clues:{" "}
+              {currentSettings.clues}
+            </Text>
           </View>
-          <Text style={styles.percentageHint}>
-            {percentage}% → ~{targetClues} clues, difficulty{" "}
-            {minDiff.toFixed(2)}-{maxDiff.toFixed(2)}
-          </Text>
-        </View>
+        )}
 
         {/* Puzzle Info */}
         {grid && !isGenerating && (
@@ -368,6 +404,12 @@ export default function GenerateSudokuScreen() {
           disabled={!grid || isGenerating}
           style={styles.addButton}
         />
+      </View>
+      <View style={styles.generateNoteContainer}>
+        <Text style={styles.generateNoteText}>
+          Generator note: this app usually does not create very hard puzzles.
+          For truly hard or extreme sudokus, try sudoku.coach.
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -439,40 +481,41 @@ const styles = StyleSheet.create({
   difficultyTextActive: {
     color: Colors.textPrimary,
   },
-  percentageContainer: {
+  customContainer: {
     paddingHorizontal: Spacing.screenHorizontal,
     marginBottom: Spacing.lg,
   },
-  percentageRow: {
+  customInputsRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: Spacing.sm,
   },
-  percentageInput: {
+  customInputGroup: {
     flex: 1,
-    maxWidth: 80,
+  },
+  customInputLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textMuted,
+    marginBottom: Spacing.xs,
+  },
+  customInput: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.borderLight,
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: Typography.fontSize.lg,
+    padding: Spacing.sm,
+    fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
     textAlign: "center",
   },
-  percentageSymbol: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.textPrimary,
-  },
-  applyButton: {
-    marginLeft: "auto",
-  },
-  percentageHint: {
+  customHint: {
     marginTop: Spacing.sm,
     fontSize: Typography.fontSize.xs,
     color: Colors.textMuted,
+  },
+  applyButton: {
+    marginLeft: Spacing.xs,
   },
   infoContainer: {
     paddingHorizontal: Spacing.screenHorizontal,
@@ -502,9 +545,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.md,
     paddingHorizontal: Spacing.screenHorizontal,
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
+  },
+  generateNoteContainer: {
+    paddingHorizontal: Spacing.screenHorizontal,
+    paddingBottom: Spacing.lg,
+  },
+  generateNoteText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textMuted,
+    lineHeight: Typography.lineHeight.sm,
   },
   generateButton: {
     flex: 1,

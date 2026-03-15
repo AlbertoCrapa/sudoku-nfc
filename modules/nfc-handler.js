@@ -335,7 +335,7 @@ function getTagCapacity(tag) {
 
 /**
  * Writes Sudoku puzzles to an NFC tag with capacity awareness.
- * Only writes complete 81-character puzzles that fit.
+ * Returns overflow info if puzzles exceed capacity, without writing.
  *
  * @param {string[]} puzzles - Array of 81-character puzzle strings
  * @param {boolean} append - If true, append to existing puzzles
@@ -346,7 +346,9 @@ function getTagCapacity(tag) {
  *   written: number,
  *   attempted: number,
  *   discarded: number,
- *   capacity?: number
+ *   capacity?: number,
+ *   maxPuzzles?: number,
+ *   overflow?: boolean
  * }>}
  */
 export async function writePuzzlesToTag(
@@ -360,6 +362,7 @@ export async function writePuzzlesToTag(
     written: 0,
     attempted: puzzles.length,
     discarded: 0,
+    overflow: false,
   };
 
   try {
@@ -420,15 +423,26 @@ export async function writePuzzlesToTag(
     // Calculate how many complete puzzles can fit
     const maxPuzzles = maxPuzzlesForCapacity(availableBytes);
 
-    // Limit puzzles to what fits
-    const puzzlesToWrite = allPuzzles.slice(0, maxPuzzles);
-    result.written = puzzlesToWrite.length;
-    result.discarded = allPuzzles.length - puzzlesToWrite.length;
+    // Check if puzzles exceed capacity
+    result.maxPuzzles = maxPuzzles;
+    result.discarded = Math.max(0, allPuzzles.length - maxPuzzles);
 
-    if (puzzlesToWrite.length === 0) {
+    if (maxPuzzles === 0) {
       result.message = "Tag capacity too small for even one puzzle.";
       return result;
     }
+
+    // If there are too many puzzles, return overflow info without writing
+    if (allPuzzles.length > maxPuzzles) {
+      result.overflow = true;
+      result.attempted = allPuzzles.length;
+      result.message = `Too many puzzles. Loaded: ${allPuzzles.length} - Max: ${maxPuzzles}`;
+      return result;
+    }
+
+    // All puzzles fit, proceed with writing
+    const puzzlesToWrite = allPuzzles;
+    result.written = puzzlesToWrite.length;
 
     // Encode data
     const encodedData = encodePuzzleData(puzzlesToWrite);
@@ -445,11 +459,7 @@ export async function writePuzzlesToTag(
     await NfcManager.ndefHandler.writeNdefMessage(bytes);
 
     result.success = true;
-    if (result.discarded > 0) {
-      result.message = `Wrote ${result.written} puzzle(s). ${result.discarded} discarded (tag full).`;
-    } else {
-      result.message = `Successfully wrote ${result.written} puzzle(s) to tag.`;
-    }
+    result.message = `Successfully wrote ${result.written} puzzle(s) to tag.`;
     return result;
   } catch (error) {
     console.error("Error writing NFC tag:", error);

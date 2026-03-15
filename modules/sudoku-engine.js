@@ -540,6 +540,7 @@ export function generateSolution() {
 export function solveWithSingles(puzzle, returnDifficulty = false) {
   const grid = deepCopyGrid(puzzle);
   const initialEmptyCells = grid.flat().filter((x) => x === 0).length;
+  let highestTechnique = 0;
 
   if (initialEmptyCells === 0) {
     return returnDifficulty ? 0.0 : grid;
@@ -567,145 +568,323 @@ export function solveWithSingles(puzzle, returnDifficulty = false) {
     }
   }
 
-  let progress = true;
   let steps = 0;
+  let contradiction = false;
 
-  while (emptyCellsCount > 0 && progress) {
-    progress = false;
-
-    // Find and apply naked singles
+  function hasContradiction() {
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
-        if (grid[r][c] === 0 && possibilities[r][c].size === 1) {
-          const val = [...possibilities[r][c]][0];
-          grid[r][c] = val;
-          emptyCellsCount--;
-          steps++;
-          progress = true;
+        if (grid[r][c] === 0 && possibilities[r][c].size === 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
-          // Update possibilities
-          for (let i = 0; i < 9; i++) {
-            possibilities[r][i].delete(val);
-            possibilities[i][c].delete(val);
-          }
-          const startRow = Math.floor(r / 3) * 3;
-          const startCol = Math.floor(c / 3) * 3;
-          for (let row = startRow; row < startRow + 3; row++) {
-            for (let col = startCol; col < startCol + 3; col++) {
-              possibilities[row][col].delete(val);
-            }
-          }
-          possibilities[r][c] = new Set();
+  function applyPlacement(row, col, value) {
+    if (grid[row][col] !== 0) {
+      return false;
+    }
+
+    grid[row][col] = value;
+    possibilities[row][col] = new Set();
+    emptyCellsCount--;
+
+    for (let i = 0; i < 9; i++) {
+      if (grid[row][i] === 0) {
+        possibilities[row][i].delete(value);
+      }
+      if (grid[i][col] === 0) {
+        possibilities[i][col].delete(value);
+      }
+    }
+
+    const startRow = Math.floor(row / 3) * 3;
+    const startCol = Math.floor(col / 3) * 3;
+    for (let r = startRow; r < startRow + 3; r++) {
+      for (let c = startCol; c < startCol + 3; c++) {
+        if (grid[r][c] === 0) {
+          possibilities[r][c].delete(value);
         }
       }
     }
 
-    // Find and apply hidden singles
-    for (let unit = 0; unit < 9; unit++) {
-      // Rows
+    return !hasContradiction();
+  }
+
+  function findBoxHiddenSingle() {
+    for (let box = 0; box < 9; box++) {
+      const boxRow = Math.floor(box / 3) * 3;
+      const boxCol = (box % 3) * 3;
+
       for (let num = 1; num <= 9; num++) {
-        const locations = [];
-        for (let c = 0; c < 9; c++) {
-          if (grid[unit][c] === 0 && possibilities[unit][c].has(num)) {
-            locations.push(c);
-          }
-        }
-        if (locations.length === 1) {
-          const c = locations[0];
-          grid[unit][c] = num;
-          emptyCellsCount--;
-          steps++;
-          progress = true;
+        let location = null;
+        let count = 0;
 
-          // Update possibilities
-          for (let i = 0; i < 9; i++) {
-            possibilities[unit][i].delete(num);
-            possibilities[i][c].delete(num);
-          }
-          const startRow = Math.floor(unit / 3) * 3;
-          const startCol = Math.floor(c / 3) * 3;
-          for (let row = startRow; row < startRow + 3; row++) {
-            for (let col = startCol; col < startCol + 3; col++) {
-              possibilities[row][col].delete(num);
-            }
-          }
-          possibilities[unit][c] = new Set();
-        }
-      }
-
-      // Columns
-      for (let num = 1; num <= 9; num++) {
-        const locations = [];
-        for (let r = 0; r < 9; r++) {
-          if (grid[r][unit] === 0 && possibilities[r][unit].has(num)) {
-            locations.push(r);
-          }
-        }
-        if (locations.length === 1) {
-          const r = locations[0];
-          grid[r][unit] = num;
-          emptyCellsCount--;
-          steps++;
-          progress = true;
-
-          // Update possibilities
-          for (let i = 0; i < 9; i++) {
-            possibilities[r][i].delete(num);
-            possibilities[i][unit].delete(num);
-          }
-          const startRow = Math.floor(r / 3) * 3;
-          const startCol = Math.floor(unit / 3) * 3;
-          for (let row = startRow; row < startRow + 3; row++) {
-            for (let col = startCol; col < startCol + 3; col++) {
-              possibilities[row][col].delete(num);
-            }
-          }
-          possibilities[r][unit] = new Set();
-        }
-      }
-
-      // Boxes
-      const boxRow = Math.floor(unit / 3) * 3;
-      const boxCol = (unit % 3) * 3;
-      for (let num = 1; num <= 9; num++) {
-        const locations = [];
         for (let r = boxRow; r < boxRow + 3; r++) {
           for (let c = boxCol; c < boxCol + 3; c++) {
             if (grid[r][c] === 0 && possibilities[r][c].has(num)) {
-              locations.push({ r, c });
+              count++;
+              location = { row: r, col: c, value: num };
+              if (count > 1) {
+                break;
+              }
             }
+          }
+          if (count > 1) {
+            break;
           }
         }
-        if (locations.length === 1) {
-          const { r, c } = locations[0];
-          grid[r][c] = num;
-          emptyCellsCount--;
-          steps++;
-          progress = true;
 
-          // Update possibilities
-          for (let i = 0; i < 9; i++) {
-            possibilities[r][i].delete(num);
-            possibilities[i][c].delete(num);
-          }
-          for (let row = boxRow; row < boxRow + 3; row++) {
-            for (let col = boxCol; col < boxCol + 3; col++) {
-              possibilities[row][col].delete(num);
-            }
-          }
-          possibilities[r][c] = new Set();
+        if (count === 1) {
+          return location;
         }
       }
     }
+
+    return null;
+  }
+
+  function findLineHiddenSingle() {
+    // Rows
+    for (let row = 0; row < 9; row++) {
+      for (let num = 1; num <= 9; num++) {
+        let location = null;
+        let count = 0;
+
+        for (let col = 0; col < 9; col++) {
+          if (grid[row][col] === 0 && possibilities[row][col].has(num)) {
+            count++;
+            location = { row, col, value: num };
+            if (count > 1) {
+              break;
+            }
+          }
+        }
+
+        if (count === 1) {
+          return location;
+        }
+      }
+    }
+
+    // Columns
+    for (let col = 0; col < 9; col++) {
+      for (let num = 1; num <= 9; num++) {
+        let location = null;
+        let count = 0;
+
+        for (let row = 0; row < 9; row++) {
+          if (grid[row][col] === 0 && possibilities[row][col].has(num)) {
+            count++;
+            location = { row, col, value: num };
+            if (count > 1) {
+              break;
+            }
+          }
+        }
+
+        if (count === 1) {
+          return location;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function findNakedSingle() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (grid[r][c] === 0 && possibilities[r][c].size === 1) {
+          const value = [...possibilities[r][c]][0];
+          return { row: r, col: c, value };
+        }
+      }
+    }
+    return null;
+  }
+
+  function applyBoxHiddenSinglesPass() {
+    let placements = 0;
+
+    while (true) {
+      const boxMove = findBoxHiddenSingle();
+      if (!boxMove) {
+        break;
+      }
+
+      if (!applyPlacement(boxMove.row, boxMove.col, boxMove.value)) {
+        return -1;
+      }
+
+      placements++;
+    }
+
+    return placements;
+  }
+
+  function applyLineHiddenSinglesPass() {
+    let placements = 0;
+
+    while (true) {
+      const lineMove = findLineHiddenSingle();
+      if (!lineMove) {
+        break;
+      }
+
+      if (!applyPlacement(lineMove.row, lineMove.col, lineMove.value)) {
+        return -1;
+      }
+
+      placements++;
+    }
+
+    return placements;
+  }
+
+  function applyNakedSinglesPass() {
+    let placements = 0;
+
+    while (true) {
+      const nakedMove = findNakedSingle();
+      if (!nakedMove) {
+        break;
+      }
+
+      if (!applyPlacement(nakedMove.row, nakedMove.col, nakedMove.value)) {
+        return -1;
+      }
+
+      placements++;
+    }
+
+    return placements;
+  }
+
+  // Strict priority solving loop: Box Hidden Single -> Line Hidden Single -> Naked Single
+  // Each technique application is counted as one pass, even if it fills multiple cells.
+  while (emptyCellsCount > 0) {
+    const boxPlacements = applyBoxHiddenSinglesPass();
+    if (boxPlacements < 0) {
+      contradiction = true;
+      break;
+    }
+    if (boxPlacements > 0) {
+      steps++;
+      continue;
+    }
+
+    const linePlacements = applyLineHiddenSinglesPass();
+    if (linePlacements < 0) {
+      contradiction = true;
+      break;
+    }
+    if (linePlacements > 0) {
+      highestTechnique = Math.max(highestTechnique, 1);
+      steps++;
+      continue;
+    }
+
+    const nakedPlacements = applyNakedSinglesPass();
+    if (nakedPlacements < 0) {
+      contradiction = true;
+      break;
+    }
+    if (nakedPlacements > 0) {
+      highestTechnique = Math.max(highestTechnique, 2);
+      steps++;
+      continue;
+    }
+
+    // Stuck - requires more advanced techniques
+    break;
+  }
+
+  if (contradiction) {
+    return returnDifficulty ? -0.2 : puzzle;
   }
 
   if (emptyCellsCount === 0) {
-    const difficulty = initialEmptyCells > 0 ? steps / initialEmptyCells : 0.0;
+    const stepRatio = initialEmptyCells > 0 ? steps / initialEmptyCells : 0.0;
+    const difficulty = (stepRatio + highestTechnique) / 3;
     return returnDifficulty ? difficulty : grid;
   }
 
   // Stuck - requires guessing
   return returnDifficulty ? -0.1 : puzzle;
+}
+
+/**
+ * Converts a raw singles-based difficulty score into display metadata.
+ * @param {number} score - Difficulty score from solveWithSingles
+ * @returns {{score: number, normalizedScore: number, percentage: number, key: string, label: string}}
+ */
+export function getDifficultyInfoFromScore(score) {
+  const safeScore = typeof score === "number" && !isNaN(score) ? score : -0.2;
+
+  if (safeScore === -0.2) {
+    return {
+      score: safeScore,
+      normalizedScore: 0,
+      percentage: 0,
+      key: "invalid",
+      label: "Invalid",
+    };
+  }
+
+  const normalizedScore =
+    safeScore < 0 ? 1 : Math.max(0, Math.min(1, safeScore));
+  const percentage = Math.min(99.9, Math.round(normalizedScore * 1000) / 10);
+
+  if (safeScore < 0 || normalizedScore >= 0.9) {
+    return {
+      score: safeScore,
+      normalizedScore,
+      percentage,
+      key: "expert",
+      label: "Expert",
+    };
+  }
+
+  if (normalizedScore >= 2 / 3) {
+    return {
+      score: safeScore,
+      normalizedScore,
+      percentage,
+      key: "hard",
+      label: "Hard",
+    };
+  }
+
+  if (normalizedScore >= 1 / 3) {
+    return {
+      score: safeScore,
+      normalizedScore,
+      percentage,
+      key: "medium",
+      label: "Medium",
+    };
+  }
+
+  return {
+    score: safeScore,
+    normalizedScore,
+    percentage,
+    key: "easy",
+    label: "Easy",
+  };
+}
+
+/**
+ * Analyzes a puzzle and returns difficulty metadata from the singles solver.
+ * @param {number[][]} puzzle - 9x9 matrix
+ * @returns {{score: number, normalizedScore: number, percentage: number, key: string, label: string}}
+ */
+export function analyzePuzzleDifficulty(puzzle) {
+  const score = solveWithSingles(puzzle, true);
+  return getDifficultyInfoFromScore(score);
 }
 
 // ============================================================================
@@ -724,7 +903,7 @@ export function generatePuzzle(
   minDifficulty = 0.3,
   maxDifficulty = 0.7,
   targetClues = 25,
-  maxAttempts = 50,
+  maxAttempts = 45,
 ) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const solution = generateSolution();
@@ -935,6 +1114,8 @@ export default {
 
   // Solving
   solveWithSingles,
+  getDifficultyInfoFromScore,
+  analyzePuzzleDifficulty,
   solvePuzzle,
   generateSolution,
 
