@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sudoku NFC",
     "slug": "sudokunfc",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sudokunfc",
@@ -15,6 +15,7 @@
       }
     },
     "android": {
+      "versionCode": 2,
       "package": "com.albyeah.sudokunfc",
       "adaptiveIcon": {
         "backgroundColor": "#0d0e14",

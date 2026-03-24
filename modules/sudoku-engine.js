@@ -546,259 +546,184 @@ export function solveWithSingles(puzzle, returnDifficulty = false) {
     return returnDifficulty ? 0.0 : grid;
   }
 
-  // Initialize possibilities
   const possibilities = Array(9)
     .fill(null)
-    .map(() =>
+    .map((_, r) =>
       Array(9)
         .fill(null)
-        .map(() => new Set()),
+        .map((_, c) => {
+          if (grid[r][c] !== 0) {
+            return new Set();
+          }
+
+          const vals = getPossibleValues(grid, r, c);
+          return new Set(vals);
+        }),
     );
 
-  let emptyCellsCount = 0;
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
-      if (grid[r][c] === 0) {
-        possibilities[r][c] = new Set(getPossibleValues(grid, r, c));
-        if (possibilities[r][c].size === 0) {
-          return returnDifficulty ? -0.2 : puzzle;
-        }
-        emptyCellsCount++;
+      if (grid[r][c] === 0 && possibilities[r][c].size === 0) {
+        return returnDifficulty ? -0.2 : puzzle;
       }
     }
   }
 
+  let emptyCellsCount = initialEmptyCells;
   let steps = 0;
   let contradiction = false;
 
-  function hasContradiction() {
-    for (let r = 0; r < 9; r++) {
-      for (let c = 0; c < 9; c++) {
-        if (grid[r][c] === 0 && possibilities[r][c].size === 0) {
-          return true;
+  function eliminatePossibilities(rPlaced, cPlaced, valPlaced) {
+    let hasContradiction = false;
+
+    const updateCell = (r, c) => {
+      if (possibilities[r][c].has(valPlaced)) {
+        possibilities[r][c].delete(valPlaced);
+        if (possibilities[r][c].size === 0 && grid[r][c] === 0) {
+          hasContradiction = true;
         }
       }
-    }
-    return false;
-  }
-
-  function applyPlacement(row, col, value) {
-    if (grid[row][col] !== 0) {
-      return false;
-    }
-
-    grid[row][col] = value;
-    possibilities[row][col] = new Set();
-    emptyCellsCount--;
+    };
 
     for (let i = 0; i < 9; i++) {
-      if (grid[row][i] === 0) {
-        possibilities[row][i].delete(value);
-      }
-      if (grid[i][col] === 0) {
-        possibilities[i][col].delete(value);
-      }
+      updateCell(rPlaced, i);
+      updateCell(i, cPlaced);
     }
 
-    const startRow = Math.floor(row / 3) * 3;
-    const startCol = Math.floor(col / 3) * 3;
+    const startRow = Math.floor(rPlaced / 3) * 3;
+    const startCol = Math.floor(cPlaced / 3) * 3;
     for (let r = startRow; r < startRow + 3; r++) {
       for (let c = startCol; c < startCol + 3; c++) {
-        if (grid[r][c] === 0) {
-          possibilities[r][c].delete(value);
-        }
+        updateCell(r, c);
       }
     }
 
-    return !hasContradiction();
+    return hasContradiction;
   }
 
-  function findBoxHiddenSingle() {
-    for (let box = 0; box < 9; box++) {
-      const boxRow = Math.floor(box / 3) * 3;
-      const boxCol = (box % 3) * 3;
-
-      for (let num = 1; num <= 9; num++) {
-        let location = null;
-        let count = 0;
-
-        for (let r = boxRow; r < boxRow + 3; r++) {
-          for (let c = boxCol; c < boxCol + 3; c++) {
-            if (grid[r][c] === 0 && possibilities[r][c].has(num)) {
-              count++;
-              location = { row: r, col: c, value: num };
-              if (count > 1) {
-                break;
-              }
-            }
-          }
-          if (count > 1) {
-            break;
-          }
-        }
-
-        if (count === 1) {
-          return location;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  function findLineHiddenSingle() {
-    // Rows
-    for (let row = 0; row < 9; row++) {
-      for (let num = 1; num <= 9; num++) {
-        let location = null;
-        let count = 0;
-
-        for (let col = 0; col < 9; col++) {
-          if (grid[row][col] === 0 && possibilities[row][col].has(num)) {
-            count++;
-            location = { row, col, value: num };
-            if (count > 1) {
-              break;
-            }
-          }
-        }
-
-        if (count === 1) {
-          return location;
-        }
-      }
-    }
-
-    // Columns
-    for (let col = 0; col < 9; col++) {
-      for (let num = 1; num <= 9; num++) {
-        let location = null;
-        let count = 0;
-
-        for (let row = 0; row < 9; row++) {
-          if (grid[row][col] === 0 && possibilities[row][col].has(num)) {
-            count++;
-            location = { row, col, value: num };
-            if (count > 1) {
-              break;
-            }
-          }
-        }
-
-        if (count === 1) {
-          return location;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  function findNakedSingle() {
+  function findNakedSingles() {
+    const updates = [];
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
         if (grid[r][c] === 0 && possibilities[r][c].size === 1) {
-          const value = [...possibilities[r][c]][0];
-          return { row: r, col: c, value };
+          updates.push([r, c, [...possibilities[r][c]][0]]);
         }
       }
     }
-    return null;
+    return updates;
   }
 
-  function applyBoxHiddenSinglesPass() {
-    let placements = 0;
+  function findHiddenSingles(unitType, unitIndex) {
+    const updates = [];
+    const unitPossibilities = Array.from({ length: 10 }, () => []);
+    let coordinates = [];
 
-    while (true) {
-      const boxMove = findBoxHiddenSingle();
-      if (!boxMove) {
-        break;
+    if (unitType === "row") {
+      coordinates = Array.from({ length: 9 }, (_, c) => [unitIndex, c]);
+    } else if (unitType === "col") {
+      coordinates = Array.from({ length: 9 }, (_, r) => [r, unitIndex]);
+    } else if (unitType === "box") {
+      const startRow = Math.floor(unitIndex / 3) * 3;
+      const startCol = (unitIndex % 3) * 3;
+      for (let r = startRow; r < startRow + 3; r++) {
+        for (let c = startCol; c < startCol + 3; c++) {
+          coordinates.push([r, c]);
+        }
       }
-
-      if (!applyPlacement(boxMove.row, boxMove.col, boxMove.value)) {
-        return -1;
-      }
-
-      placements++;
     }
 
-    return placements;
-  }
-
-  function applyLineHiddenSinglesPass() {
-    let placements = 0;
-
-    while (true) {
-      const lineMove = findLineHiddenSingle();
-      if (!lineMove) {
-        break;
+    for (const [r, c] of coordinates) {
+      if (grid[r][c] === 0) {
+        for (const num of possibilities[r][c]) {
+          unitPossibilities[num].push([r, c]);
+        }
       }
-
-      if (!applyPlacement(lineMove.row, lineMove.col, lineMove.value)) {
-        return -1;
-      }
-
-      placements++;
     }
 
-    return placements;
+    unitPossibilities.forEach((locations, num) => {
+      if (locations.length === 1) {
+        const [r, c] = locations[0];
+        if (grid[r][c] === 0) {
+          updates.push([r, c, num]);
+        }
+      }
+    });
+
+    return updates;
   }
 
-  function applyNakedSinglesPass() {
-    let placements = 0;
+  function findAndApplyUpdates(techniqueType) {
+    let updates = [];
 
-    while (true) {
-      const nakedMove = findNakedSingle();
-      if (!nakedMove) {
-        break;
+    if (techniqueType === "BoxHS") {
+      for (let i = 0; i < 9; i++) {
+        updates.push(...findHiddenSingles("box", i));
       }
-
-      if (!applyPlacement(nakedMove.row, nakedMove.col, nakedMove.value)) {
-        return -1;
+    } else if (techniqueType === "LineHS") {
+      for (let i = 0; i < 9; i++) {
+        updates.push(...findHiddenSingles("row", i));
+        updates.push(...findHiddenSingles("col", i));
       }
-
-      placements++;
+    } else if (techniqueType === "NakedSingle") {
+      updates = findNakedSingles();
     }
 
-    return placements;
+    if (updates.length === 0) {
+      return false;
+    }
+
+    const seen = new Set();
+    for (const [r, c, val] of updates) {
+      const key = `${r},${c}`;
+      if (!seen.has(key) && grid[r][c] === 0) {
+        seen.add(key);
+        grid[r][c] = val;
+        emptyCellsCount--;
+
+        if (eliminatePossibilities(r, c, val)) {
+          contradiction = true;
+        }
+
+        possibilities[r][c] = new Set();
+      }
+    }
+
+    return true;
   }
 
-  // Strict priority solving loop: Box Hidden Single -> Line Hidden Single -> Naked Single
-  // Each technique application is counted as one pass, even if it fills multiple cells.
   while (emptyCellsCount > 0) {
-    const boxPlacements = applyBoxHiddenSinglesPass();
-    if (boxPlacements < 0) {
-      contradiction = true;
-      break;
-    }
-    if (boxPlacements > 0) {
+    const previousEmptyCount = emptyCellsCount;
+
+    findAndApplyUpdates("BoxHS");
+    if (emptyCellsCount < previousEmptyCount) {
       steps++;
+      if (contradiction) {
+        break;
+      }
+      continue;
+    }
+    highestTechnique = Math.max(1, highestTechnique);
+
+    findAndApplyUpdates("LineHS");
+    if (emptyCellsCount < previousEmptyCount) {
+      steps++;
+      if (contradiction) {
+        break;
+      }
+      continue;
+    }
+    highestTechnique = Math.max(2, highestTechnique);
+
+    findAndApplyUpdates("NakedSingle");
+    if (emptyCellsCount < previousEmptyCount) {
+      steps++;
+      if (contradiction) {
+        break;
+      }
       continue;
     }
 
-    const linePlacements = applyLineHiddenSinglesPass();
-    if (linePlacements < 0) {
-      contradiction = true;
-      break;
-    }
-    if (linePlacements > 0) {
-      highestTechnique = Math.max(highestTechnique, 1);
-      steps++;
-      continue;
-    }
-
-    const nakedPlacements = applyNakedSinglesPass();
-    if (nakedPlacements < 0) {
-      contradiction = true;
-      break;
-    }
-    if (nakedPlacements > 0) {
-      highestTechnique = Math.max(highestTechnique, 2);
-      steps++;
-      continue;
-    }
-
-    // Stuck - requires more advanced techniques
+    // Stuck - requires more advanced techniques.
     break;
   }
 
@@ -807,12 +732,10 @@ export function solveWithSingles(puzzle, returnDifficulty = false) {
   }
 
   if (emptyCellsCount === 0) {
-    const stepRatio = initialEmptyCells > 0 ? steps / initialEmptyCells : 0.0;
-    const difficulty = (stepRatio + highestTechnique) / 3;
+    const difficulty = (steps / initialEmptyCells + highestTechnique) / 3;
     return returnDifficulty ? difficulty : grid;
   }
 
-  // Stuck - requires guessing
   return returnDifficulty ? -0.1 : puzzle;
 }
 
